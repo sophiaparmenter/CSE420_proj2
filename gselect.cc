@@ -1,128 +1,137 @@
 #include "cpu/pred/gselect.hh"
 
-GSelectBP::GselectBP(const LocalBPParams *params)
+#include "base/bitfield.hh"
+#include "base/intmath.hh"
+#include "base/logging.hh"
+#include "base/trace.hh"
+#include "debug/Fetch.hh"
+
+GSelectBP::GSelectBP(const GSelectBPParams *params)
     : BPredUnit(params),
-      PredictorSize(params->PredictorSize),
+      globalHistoryBits(params->globalHistoryBits),
       PHTCtrBits(params->PHTCtrBits),
-      localPredictorSets(PredictorSize / PHTCtrBits),
-      localCtrs(localPredictorSets, SatCounter(PHTCtrBits)),
-      indexMask(localPredictorSets - 1)
-      {
-      }
-         
-void      
-GSelectBP::lookup(ThreadID tid, Addr branchAddr, void * &bpHistory)
+      PredictorSize(params->PredictorSize)  
 {
 
-//begin 2bit local implementation
-    bool taken;
-    
+	if (!isPowerOf2(PredictorSize)){
+		fatal("Invalid local predictor size!\n");
+		}
+	DPRINTF(Fetch, "predictor size: %i\n", PredictorSize);
+	DPRINTF(Fetch, "PHT counter bits: %i\n", PHTCtrBits);
+     
+      }
+         
+bool GSelectBP::lookup(ThreadID tid, Addr branchAddr, void * &bpHistory)
+{
+
+//begin 2bit local implementation (from class powerpoint)
+    bool taken;    
     //get the index from the branch address
-    unsigned local_predictor_idx = getLocalIndex(branch_addr);
-    
+    unsigned local_predictor_idx = getLocalIndex(branchAddr);    
+    DPRINTF(Fetch, "Looking up index %#x\n", local_predictor_idx);        
     //access the counter
-    uint8_t counter_val = localCtrs[local_predictor_dx];
-    
+    //uint8_t counter_val = localCtrs[local_predictor_dx];    
+    //DPRINTF(Fetch, "prediction is %i.\n", (int)counter_val);
     //predict from counter's value, if MSB is 1
-    taken = getPrediction(counter_val);
+    //taken = getPrediction(counter_val);
 
-
-//begin bimodal implementation
+//begin bimodal implementation (from class powerpoint)
     BPHistory *history = new BPHistory;
-    history->globalHistoryReg	 = globalHistoryReg[tid];
+    //history->globalHistoryReg	 = globalHistoryReg[tid];
     bpHistory = static_cast<void*>(history);
    //prediction functionality
    
-   updateGlobalHistReg(tid, finalPrediction);
+   //update history object and global history register with prediction
+   //updates finalPrediction
+   //updateGlobalHistReg(tid, finalPrediction);
    
    //global history final prediction
-    
+    return taken;
 }
 
-unsigned
-GSelectBP::getLocalIndex(Addr &branch_addr)
+void GSelectBP::btbUpdate(ThreadID tid, Addr branchAddr, void * &bpHistory)
 {
-	return (branch_addr >> instShiftAmt) & indexMask;
-	
+
+	//globalHistoryReg[tid] &= (historyRegisterMask & ~ULL(1));
 }
 
-bool
-GSelectBP::getPrediction(uint8_t &count)
-{
-	return (count >> (PHTCtrBits -1));
-}
-
-void
-GSelectBP::update(ThreadID tid, Addr branchAddr, bool taken, void *bpHistory, bool squashed, const StaticInstPtr & inst, Addr corrTarget)
+void GSelectBP::update(ThreadID tid, Addr branchAddr, bool taken, void *bpHistory, bool squashed, const StaticInstPtr & inst, Addr corrTarget)
 {
 
-//2 bit select implementation
-	assert(bp_history == NULL);
-	unsigned local_predictor_idx;
-	
+//combined 2 bit select and bimode implementation
+	assert(bpHistory);
+	BPHistory *history = static_cast<BPHistory*>(bpHistory);
+	unsigned local_predictor_idx;	
 	//no state to store and we do not update on the wrong path
-	if (squashed){
-	
+	if (squashed){	
 	//from bimode implementation
-		globalHistoryReg[tid] = (history->globalHistoryReg << 1) | taken;
+		//globalHistoryReg[tid] = (history->globalHistoryReg << 1) | taken;
 		return;
 		}
 		
-	local_predictor_idx = getLocalIndex(branch_addr);
+	local_predictor_idx = getLocalIndex(branchAddr);
+	DPRINTF(Fetch, "Looking up index %#x\n", local_predictor_idx);
 	
 	if (taken){
-		localCtrs[local_predictor_idx]++;
+		DPRINTF(Fetch, "Branch updated as taken.\n");
+		//PHTCtrBits[local_predictor_idx]++;
 		
 		//from bimode implementation
 		delete history;
 		}
 	else {
-		localCtrs[local_predictor_idx]--;
-		}
-		
-//bimode implementation
-	assert(bpHistory);
-	BPHistory *history = static_cast<BPHistory*>(bpHistory);
-		
-	i
+		DPRINTF(Fetch, "Branch updated as not taken.\n");
+		//PHTCtrBits[local_predictor_idx]--;
+		}		
 }
 
-void
-GSelectBP::uncondBranch(ThreadID tid, Addr pc, void * &bpHistory)
+void GSelectBP::uncondBranch(ThreadID tid, Addr pc, void * &bpHistory)
 {
-	BPHistory *history = newBPHistory;
-	history->globalHistoryReg = globalHistoryReg[tid];
+
+//2 bit select leaves this function empty
+
+//bimode implementation (per class powerpoint)
+	BPHistory *history = new BPHistory;
+	//history->globalHistoryReg = globalHistoryReg[tid];
 	bpHistory = static_cast<void*>(history);
 	updateGlobalHistReg(tid, true);
 }
 
-void 
-GSelectBP::updateGlobalHistReg(Thread tid, bool taken)
-{
-	globalHistoryReg[tid] = taken ? (globalHistoryReg[tid] << 1) | 1 :
-					(globalHistoryReg[tid] << 1);
-	globalHistoryReg[tid] &= historyRegisterMask;
-	
-}
-void
-GSelectBP::btbUpdate(ThreadID tid, Addr branchAddr, void * &bpHistory)
+void GSelectBP::squash(ThreadID tid, void *bpHistory)
 {
 
-	globalHistoryReg[tid] &= (historyRegisterMask & ~1ULL);
-}
+//2-bit select leaves squash empty
 
-void
-GSelectBP::squash(ThreadID tid, void *bpHistory)
-{
-
+//bimode implementation (from class powerpoint)
 	BPHistory *history = static_cast<BPHistory*>(bpHistory);
-	globalHistoryReg[tid] = history->globalHistoryReg;
+	//history->globalHistoryReg[tid] = history->globalHistoryReg;
 	delete history;
 
 }
 
-GSelectBP*
-GSelectBPParams::create()
+inline unsigned GSelectBP::getLocalIndex(Addr &branch_addr)
 {
-    return new GSelectBP(this);
+	//return (branch_addr >> instShiftAmt) & indexMask;
+	
 }
+
+inline bool GSelectBP::getPrediction(uint8_t &count)
+{
+	//Get the MSB of the count
+	return (count >> (PHTCtrBits -1));
+}
+
+
+
+void GSelectBP::updateGlobalHistReg(ThreadID tid, bool taken)
+{
+	//globalHistoryBits[tid] = taken ? (globalHistoryBits[tid] << 1) | 1 :
+					//(globalHistoryBits[tid] << 1);
+	//globalHistoryBits[tid] &= historyRegisterMask;
+	
+}
+
+GSelectBP* GSelectBPParams::create(){
+	return new GSelectBP(this);
+}
+
