@@ -10,16 +10,23 @@ GSelectBP::GSelectBP(const GSelectBPParams *params)
     : BPredUnit(params),
       globalHistoryBits(params->globalHistoryBits),
       PHTCtrBits(params->PHTCtrBits),
-      PredictorSize(params->PredictorSize)  
+      PredictorSize(params->PredictorSize),
+      localPredictorSets(PredictorSize / PHTCtrBits),
+      localCtrs(localPredictorSets, SatCounter(PHTCtrBits)),
+      indexMask(localPredictorSets -1 ) 
 {
 
 	if (!isPowerOf2(PredictorSize)){
 		fatal("Invalid local predictor size!\n");
 		}
+	
+	historyRegisterMask = mask(globalHistoryBits);
 	DPRINTF(Fetch, "predictor size: %i\n", PredictorSize);
 	DPRINTF(Fetch, "PHT counter bits: %i\n", PHTCtrBits);
      
       }
+      
+      
          
 bool GSelectBP::lookup(ThreadID tid, Addr branchAddr, void * &bpHistory)
 {
@@ -37,13 +44,13 @@ bool GSelectBP::lookup(ThreadID tid, Addr branchAddr, void * &bpHistory)
 
 //begin bimodal implementation (from class powerpoint)
     BPHistory *history = new BPHistory;
-    //history->globalHistoryReg	 = globalHistoryReg[tid];
+    history->globalHistoryReg	 = globalHistoryReg[tid];
     bpHistory = static_cast<void*>(history);
    //prediction functionality
    
    //update history object and global history register with prediction
    //updates finalPrediction
-   //updateGlobalHistReg(tid, finalPrediction);
+   updateGlobalHistReg(tid, history->finalPrediction);
    
    //global history final prediction
     return taken;
@@ -111,7 +118,7 @@ void GSelectBP::squash(ThreadID tid, void *bpHistory)
 
 inline unsigned GSelectBP::getLocalIndex(Addr &branch_addr)
 {
-	//return (branch_addr >> instShiftAmt) & indexMask;
+	return (branch_addr >> 4) & indexMask;
 	
 }
 
@@ -125,9 +132,9 @@ inline bool GSelectBP::getPrediction(uint8_t &count)
 
 void GSelectBP::updateGlobalHistReg(ThreadID tid, bool taken)
 {
-	//globalHistoryBits[tid] = taken ? (globalHistoryBits[tid] << 1) | 1 :
-					//(globalHistoryBits[tid] << 1);
-	//globalHistoryBits[tid] &= historyRegisterMask;
+	globalHistoryReg[tid] = taken ? (globalHistoryReg[tid] << 1) | 1 :
+					(globalHistoryReg[tid] << 1);
+	globalHistoryReg[tid] &= historyRegisterMask;
 	
 }
 

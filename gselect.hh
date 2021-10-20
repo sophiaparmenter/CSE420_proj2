@@ -46,11 +46,11 @@ class GSelectBP : public BPredUnit
         // the final taken/not-taken prediction
         // true: predict taken
         // false: predict not-taken
-        //might not need - bool finalPred;
+        bool finalPrediction;
     };
     
-    //unsigned globalHistoryBits;
-    //unsigned historyRegisterMask;
+ 
+    unsigned historyRegisterMask;
     
     //unsigned choicePredictorSize;
     //unsigned choiceCtrBits;
@@ -64,10 +64,10 @@ class GSelectBP : public BPredUnit
     //unsigned notTakenThreshold;
     
     /** Array of counters that make up the bimode predictor. */
-    //std::vector<unsigned> globalHistoryReg;
-    //std::vector<SatCounter> choiceCounters;
-    //std::vector<SatCounter> takenCounters;
-    //std::vector<SatCounter> notTakenCounters;
+    std::vector<unsigned> globalHistoryReg;
+    std::vector<SatCounter> choiceCounters;
+    std::vector<SatCounter> takenCounters;
+    std::vector<SatCounter> notTakenCounters;
     
 //2-bit local functions and variables
     inline bool getPrediction(uint8_t &count);
@@ -81,17 +81,17 @@ class GSelectBP : public BPredUnit
     /** Number of bits of the local predictor's counters. */
     const unsigned PHTCtrBits;
     
-    const unsigned globalHistoryBits;
+    unsigned globalHistoryBits;
 
     /** Number of sets. */
-    //const unsigned localPredictorSets;
+    const unsigned localPredictorSets;
 
     /** Array of counters that make up the local predictor. */
-    //std::vector<SatCounter> localCtrs;
+    std::vector<SatCounter> localCtrs;
 
     
     /** Mask to get index bits. */
-    //const unsigned indexMask;
+    const unsigned indexMask;
 };
 
 #endif // __CPU_PRED_G_SELECT_PRED_HH__
