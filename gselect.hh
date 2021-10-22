@@ -87,8 +87,9 @@ class GSelectBP : public BPredUnit
     const unsigned localPredictorSets;
 
     /** Array of counters that make up the local predictor. */
-    std::vector<SatCounter> localCtrs;
-
+    std::vector<SatCounter> CounterCtrs;
+ 
+    unsigned counterThreshold;
     
     /** Mask to get index bits. */
     const unsigned indexMask;

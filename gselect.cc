@@ -12,7 +12,7 @@ GSelectBP::GSelectBP(const GSelectBPParams *params)
       PHTCtrBits(params->PHTCtrBits),
       PredictorSize(params->PredictorSize),
       localPredictorSets(PredictorSize / PHTCtrBits),
-      localCtrs(localPredictorSets, SatCounter(PHTCtrBits)),
+      CounterCtrs(localPredictorSets, SatCounter(PHTCtrBits)),
       indexMask(localPredictorSets -1 ) 
 {
 
@@ -31,29 +31,35 @@ GSelectBP::GSelectBP(const GSelectBPParams *params)
 bool GSelectBP::lookup(ThreadID tid, Addr branchAddr, void * &bpHistory)
 {
 
-//begin 2bit local implementation (from class powerpoint)
-    bool taken;    
-    //get the index from the branch address
-    unsigned local_predictor_idx = getLocalIndex(branchAddr);    
-    DPRINTF(Fetch, "Looking up index %#x\n", local_predictor_idx);        
-    //access the counter
-    //uint8_t counter_val = localCtrs[local_predictor_dx];    
-    //DPRINTF(Fetch, "prediction is %i.\n", (int)counter_val);
-    //predict from counter's value, if MSB is 1
-    //taken = getPrediction(counter_val);
+bool taken;
 
-//begin bimodal implementation (from class powerpoint)
-    BPHistory *history = new BPHistory;
-    history->globalHistoryReg	 = globalHistoryReg[tid];
-    bpHistory = static_cast<void*>(history);
-   //prediction functionality
-   
-   //update history object and global history register with prediction
-   //updates finalPrediction
-   updateGlobalHistReg(tid, history->finalPrediction);
-   
-   //global history final prediction
-    return taken;
+//m bits from the brach address
+unsigned mBits = getLocalIndex(branchAddr);
+
+//n bits from the global shift register
+unsigned nBits = globalHistoryReg[tid] & historyRegisterMask;
+
+//cocatenate m bits and shift n bits m to the left
+nBits = nBits << PHTCtrBits;
+
+//add m+n
+unsigned predIndex = nBits + mBits;
+
+//determine taken or not taken
+//see whether counter is less than or greater than half
+taken = counterThreshold < CounterCtrs[predIndex];
+
+//update history
+BPHistory *history = new BPHistory;
+history->globalHistoryReg = globalHistoryReg[tid];
+history->finalPrediction = taken;
+
+bpHistory = static_cast<void*>(history);
+updateGlobalHistReg(tid, taken);
+
+return taken;
+
+
 }
 
 void GSelectBP::btbUpdate(ThreadID tid, Addr branchAddr, void * &bpHistory)
