@@ -13,24 +13,22 @@ class GSelectBP : public BPredUnit
   public:
 
     GSelectBP(const GSelectBPParams *params);    
-    
     bool lookup(ThreadID tid, Addr branch_addr, void * &bp_history);
-
     void update(ThreadID tid, Addr branch_addr, bool taken, void *bp_history, bool squashed, const StaticInstPtr & inst, Addr corrTarget);
-    
     void uncondBranch(ThreadID tid, Addr pc, void * &bp_history);
-    
     void btbUpdate(ThreadID tid, Addr branch_addr, void * &bp_history);   
-
     void squash(ThreadID tid, void *bp_history);
 
   private:
   
   	//private variables and functions for bimode 
+	unsigned lookupIndex(Addr branch_addr);
 	void updateGlobalHistReg(ThreadID tid, bool taken);
+	unsigned predictorIndexSize;
 	
         struct BPHistory {
         unsigned globalHistoryReg;
+        bool finalPrediction;
         // was the taken array's prediction used?
         // true: takenPred used
         // false: notPred used
@@ -46,11 +44,11 @@ class GSelectBP : public BPredUnit
         // the final taken/not-taken prediction
         // true: predict taken
         // false: predict not-taken
-        bool finalPrediction;
     };
     
  
     unsigned historyRegisterMask;
+    unsigned gBranchMask;
     
     //unsigned choicePredictorSize;
     //unsigned choiceCtrBits;
@@ -68,6 +66,7 @@ class GSelectBP : public BPredUnit
     std::vector<SatCounter> choiceCounters;
     std::vector<SatCounter> takenCounters;
     std::vector<SatCounter> notTakenCounters;
+    std::vector<SatCounter> PHTCtr;
     
 //2-bit local functions and variables
     inline bool getPrediction(uint8_t &count);
@@ -87,12 +86,12 @@ class GSelectBP : public BPredUnit
     const unsigned localPredictorSets;
 
     /** Array of counters that make up the local predictor. */
-    std::vector<SatCounter> CounterCtrs;
- 
-    unsigned counterThreshold;
+    std::vector<SatCounter> localCtrs;
+
     
     /** Mask to get index bits. */
     const unsigned indexMask;
 };
 
 #endif // __CPU_PRED_G_SELECT_PRED_HH__
+
